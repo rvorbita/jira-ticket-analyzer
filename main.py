@@ -1,9 +1,17 @@
+"""
+Project: JIRA Issue Analyzer
+Author: Raymart Orbita
+Email: raymart.orbita@infor.com
+Date: 2025-07-18
+Version: 1.0.0
+Description: Parses ADF(atlassian document format) JSON and extracts relevant Jira fields.
+"""
+
 import requests
 from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 import re
 import os
-
 
 # --- Functions ---
 def find_text_after_label(adf_doc, label):
@@ -75,12 +83,27 @@ def fetch_issue_data(jira_tag):
     response = requests.get(url, headers=headers, auth=auth)
 
     # Check if the response is successful or not exit if failed
+    # if response.status_code != 200:
+    #     raise Exception(
+    #         f"Failed to retrieve issue.\n"
+    #         f"Status code: {response.status_code}\n"
+    #         f"Response: {response.text}"
+    #     )
+
+    # Check if the response is successful or not exit if failed
     if response.status_code != 200:
-        raise Exception(
-            f"Failed to retrieve issue.\n"
-            f"Status code: {response.status_code}\n"
-            f"Response: {response.text}"
-        )
+        try:
+            error_status = response.status_code
+            error_info = response.json()
+            error_messages = error_info.get("errorMessages", [])
+            if error_messages:
+                message = "\n".join(error_messages)
+            else:
+                message = "An error occurred, but no error message was provided."
+        except ValueError:
+            message = response.text.strip()
+
+        raise Exception("Status Code " + " " +str(error_status) + ", " + message)
 
     return response.json()
 
@@ -91,9 +114,8 @@ def extract_issue_fields(issue):
     fields = issue.get("fields", {})
     description = fields.get("description", {})
 
-    # print(fields)
-
-    # print(description) # For debugging purposes, print the description structure
+    # print(fields) # for debugging purposes, print the fields structure json
+    # print(description) # For debugging purposes, print the description structure json
 
     # Return a dictionary with the extracted fields
     return {
@@ -101,7 +123,8 @@ def extract_issue_fields(issue):
         "labels": fields.get("labels", []),
         "fix_versions": [v["name"] for v in fields.get("fixVersions", [])],
         "affects_versions": [v["name"] for v in fields.get("versions", [])],
-        "environment": fields.get("environment", {}).get("content", [{}])[0].get("content", [{}])[0].get("text", "N/A"),
+        # "environment": fields.get("environment", {}).get("content", [{}])[0].get("content", [{}])[0].get("text", ""),
+        "environment": get_environment_text(fields), # use helper function to prevent the Error: list index out of range
         "original_estimate": fields.get("timetracking", {}).get("originalEstimate", "N/A"),
         "time_spent": fields.get("timetracking", {}).get("timeSpent", "N/A"),
         "description": find_text_after_label(description, "Describe the issue in detail"),
@@ -238,6 +261,19 @@ def find_codeblock(obj):
     return None
 
 
+def get_environment_text(fields):
+    #safely extract the "text" from from nested structure
+    try:
+        return (
+            fields.get("environment", {})
+            .get("content", [])[0]
+            .get("content", [])[0]
+            .get("text", "")
+        )
+    except (IndexError, AttributeError, TypeError):
+        return None
+
+
 def print_issue_summary(data):
     """Display the extracted issue fields in a readable format and collect findings."""
 
@@ -252,15 +288,19 @@ def print_issue_summary(data):
     display("Summary", data.get("summary"))
     display("Base Patch Package", data.get("base_patch_package"))
     display("Affects Versions", ", ".join(data.get("affects_versions", [])))
-    display("Environment", data.get("environment"))
-    # display("Description", data.get("description"))
+    # display("Environment", data.get("environment"))
+
+    # check if the environment if None or with text provided.
+    if data.get("environment") == None:
+        findings["Environment"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
+    else:
+        display("Environment", data.get("environment"))
+
+    # display("Description", data.get("description")) # temporarly remove the description
     display("Action Taken", data.get("action_taken"))
 
-    if data.get("error_logs"):
-        display("Error Text", "Error text found.")
-    else:
-        findings["Error Text"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
-
+    # check for label name unplanned and cslc-ops-svcdesk
+    # if unplanned and cslc-ops-svcdesk missing add to findings and print to the gui.
     labels = data.get("labels", [])
     missing_labels = []
     if "unplanned" not in labels:
@@ -273,6 +313,14 @@ def print_issue_summary(data):
         print(f" * Labels: Failed - {findings['Labels']}")
     else:
         display("Labels", ", ".join(labels))
+
+    # check for error_logs if None print message.
+    if data.get("error_logs"):
+        display("Error Text", "Error text found.")
+        # print(data.get("error_logs"))
+    else:
+        findings["Error Text"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
+
 
     display("Attached Files", ", ".join(data.get("attached_files", [])))
 
