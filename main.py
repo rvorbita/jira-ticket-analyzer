@@ -1,5 +1,5 @@
 """
-Project: JIRA Issue Analyzer
+Project: JIRA Ticket Analyzer
 Author: Raymart Orbita
 Email: raymart.orbita@infor.com
 Date: 2025-07-18
@@ -12,6 +12,7 @@ from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 import re
 import os
+import sys
 
 # --- Functions ---
 def find_text_after_label(adf_doc, label):
@@ -58,11 +59,11 @@ def validate_jira_tag():
     except KeyboardInterrupt:
         # Handle keyboard interrupt gracefully
         print("\nProcess interrupted by user.")
-        exit()
+        sys.exit(0)
     except:
         # Handle invalid Jira tag format
         print("Invalid Jira tag. Please enter a valid Jira tag in the format 'CSLC-XXXXXX'.")
-        exit()
+        sys.exit(0)
 
 
 def fetch_issue_data(jira_tag):
@@ -81,14 +82,6 @@ def fetch_issue_data(jira_tag):
 
     # Make the GET request to the Jira API
     response = requests.get(url, headers=headers, auth=auth)
-
-    # Check if the response is successful or not exit if failed
-    # if response.status_code != 200:
-    #     raise Exception(
-    #         f"Failed to retrieve issue.\n"
-    #         f"Status code: {response.status_code}\n"
-    #         f"Response: {response.text}"
-    #     )
 
     # Check if the response is successful or not exit if failed
     if response.status_code != 200:
