@@ -1,5 +1,5 @@
 """
-Project: JIRA Issue Analyzer
+Project: JIRA Ticket Analyzer
 Author: Raymart Orbita
 Email: raymart.orbita@infor.com
 Date: 2025-07-18
@@ -290,11 +290,20 @@ def print_issue_summary(data):
     display("Affects Versions", ", ".join(data.get("affects_versions", [])))
     # display("Environment", data.get("environment"))
 
+    # if data.get("environment") == "<deployment_alias> - <deployment_name>":
+    #     findings["Environment"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
+    # else:
+    #     display("Environment", data.get("environment"))
+
     # check if the environment if None or with text provided.
     if data.get("environment") == None:
         findings["Environment"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
     else:
-        display("Environment", data.get("environment"))
+        if data.get("environment") == "<deployment_alias> - <deployment_name>":
+            findings["Environment"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
+        else:
+            display("Environment", data.get("environment"))
+
 
     # display("Description", data.get("description")) # temporarly remove the description
     display("Action Taken", data.get("action_taken"))
