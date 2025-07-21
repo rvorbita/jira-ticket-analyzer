@@ -12,7 +12,7 @@ VSVersionInfo(
         u'040904B0',
         [
           StringStruct(u'Owner',    u'Raymart Orbita'),
-          StringStruct(u'FileDescription',u'JIRA Ticket Analyzer stable'),
+          StringStruct(u'FileDescription',u'JIRA Ticket Analyzer Stable'),
           StringStruct(u'FileVersion',    u'1.0.0'),
           StringStruct(u'ProductName',    u'JIRA Ticket Analyzer'),
           StringStruct(u'ProductVersion', u'1.0.0'),
