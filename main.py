@@ -83,14 +83,6 @@ def fetch_issue_data(jira_tag):
     response = requests.get(url, headers=headers, auth=auth)
 
     # Check if the response is successful or not exit if failed
-    # if response.status_code != 200:
-    #     raise Exception(
-    #         f"Failed to retrieve issue.\n"
-    #         f"Status code: {response.status_code}\n"
-    #         f"Response: {response.text}"
-    #     )
-
-    # Check if the response is successful or not exit if failed
     if response.status_code != 200:
         try:
             error_status = response.status_code
@@ -129,7 +121,7 @@ def extract_issue_fields(issue):
         "time_spent": fields.get("timetracking", {}).get("timeSpent", "N/A"),
         "description": find_text_after_label(description, "Describe the issue in detail"),
         "base_patch_package": find_text_after_label(description, "Base Patch Package"),
-        "action_taken": find_text_after_label(description, "Action Taken"),
+        "action_taken": find_text_after_label(description, "Actions Taken"),
         "known_customizations": find_text_after_label(description, "Known Customizations"),
         "error_logs": find_code_black_label(description, "codeBlock"),
         "attached_files": [f["filename"] for f in fields.get("attachment", []) if f.get("filename")],
@@ -288,12 +280,6 @@ def print_issue_summary(data):
     display("Summary", data.get("summary"))
     display("Base Patch Package", data.get("base_patch_package"))
     display("Affects Versions", ", ".join(data.get("affects_versions", [])))
-    # display("Environment", data.get("environment"))
-
-    # if data.get("environment") == "<deployment_alias> - <deployment_name>":
-    #     findings["Environment"] = "Missing or invalid error logs. Please provide plain text logs, not images or attachments."
-    # else:
-    #     display("Environment", data.get("environment"))
 
     # check if the environment if None or with text provided.
     if data.get("environment") == None:
