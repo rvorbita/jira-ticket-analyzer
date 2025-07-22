@@ -122,7 +122,7 @@ def extract_issue_fields(issue):
         "time_spent": fields.get("timetracking", {}).get("timeSpent", "N/A"),
         "description": find_text_after_label(description, "Describe the issue in detail"),
         "base_patch_package": find_text_after_label(description, "Base Patch Package"),
-        "action_taken": find_text_after_label(description, "Action Taken"),
+        "action_taken": find_text_after_label(description, "Actions Taken"),
         "known_customizations": find_text_after_label(description, "Known Customizations"),
         "error_logs": find_code_black_label(description, "codeBlock"),
         "attached_files": [f["filename"] for f in fields.get("attachment", []) if f.get("filename")],
