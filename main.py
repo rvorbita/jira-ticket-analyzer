@@ -45,6 +45,59 @@ def find_text_after_label(adf_doc, label):
     # Start the extraction process from the ADF document
     return extract_texts(adf_doc.get("content", []))
 
+def extract_actions_taken_bullets(node):
+    """
+    Recursively search for bullet list items under a node labeled "Actions Taken".
+    Returns list of bullet texts or None if not found.
+    """
+
+    def is_actions_taken_label(item):
+        if item.get("type") in ("paragraph", "heading"):
+            texts = [t.get("text", "").lower() for t in item.get("content", []) if t.get("type") == "text"]
+            joined_text = " ".join(texts).strip()
+            return "actions taken" in joined_text
+        return False
+
+    def extract_bullets_from_list(bullet_list_node):
+        bullets = []
+        for list_item in bullet_list_node.get("content", []):
+            for para in list_item.get("content", []):
+                for text_obj in para.get("content", []):
+                    if text_obj.get("type") == "text":
+                        bullets.append(text_obj.get("text", ""))
+        return bullets
+
+    # If node is a dict and has content, recursively scan
+    if isinstance(node, dict):
+        content = node.get("content", [])
+        for i, item in enumerate(content):
+            # Found label "Actions Taken"
+            if is_actions_taken_label(item):
+                # Check immediate siblings for bulletList
+                bullets = []
+                # Check next siblings for bulletList nodes (sometimes multiple)
+                for sibling in content[i+1:]:
+                    if sibling.get("type") == "bulletList":
+                        bullets.extend(extract_bullets_from_list(sibling))
+                    else:
+                        # stop if next sibling is not a bulletList (optional)
+                        break
+                if bullets:
+                    return bullets
+            else:
+                # Recursive search in this item
+                found = extract_actions_taken_bullets(item)
+                if found:
+                    return found
+
+    # If node is a list, recurse each item
+    elif isinstance(node, list):
+        for item in node:
+            found = extract_actions_taken_bullets(item)
+            if found:
+                return found
+
+    return None
 
 def validate_jira_tag():
     """Prompt and validate the Jira tag input from the user."""
@@ -106,9 +159,12 @@ def extract_issue_fields(issue):
     # Get the fields from the issue
     fields = issue.get("fields", {})
     description = fields.get("description", {})
-
     # print(fields) # for debugging purposes, print the fields structure json
     # print(description) # For debugging purposes, print the description structure json
+
+    action_taken_text = find_text_after_label(description, "Actions Taken")
+    action_taken_bullets = extract_actions_taken_bullets(description)
+
 
     # Return a dictionary with the extracted fields
     return {
@@ -122,7 +178,9 @@ def extract_issue_fields(issue):
         "time_spent": fields.get("timetracking", {}).get("timeSpent", "N/A"),
         "description": find_text_after_label(description, "Describe the issue in detail"),
         "base_patch_package": find_text_after_label(description, "Base Patch Package"),
-        "action_taken": find_text_after_label(description, "Actions Taken"),
+        # "action_taken": find_text_after_label(description, "Actions Taken"),
+        "action_taken_text": action_taken_text,
+        "action_taken_bullets": action_taken_bullets,
         "known_customizations": find_text_after_label(description, "Known Customizations"),
         "error_logs": find_code_black_label(description, "codeBlock"),
         "attached_files": [f["filename"] for f in fields.get("attachment", []) if f.get("filename")],
@@ -267,6 +325,27 @@ def get_environment_text(fields):
         return None
 
 
+def get_bullet_list_text(fields, key):
+    """
+    Safely extract bullet list text items from a nested structure under the given key.
+    Returns a list of strings or None if not found.
+    """
+    try:
+        bullet_list = fields.get(key, {})
+        if bullet_list.get("type") != "bulletList":
+            return None
+        
+        bullets = []
+        for list_item in bullet_list.get("content", []):
+            for paragraph in list_item.get("content", []):
+                for text_obj in paragraph.get("content", []):
+                    if text_obj.get("type") == "text":
+                        bullets.append(text_obj.get("text", ""))
+        return bullets if bullets else None
+    except (AttributeError, IndexError, TypeError):
+        return None
+
+
 def print_issue_summary(data):
     """Display the extracted issue fields in a readable format and collect findings."""
 
@@ -290,7 +369,15 @@ def print_issue_summary(data):
         display("Environment", data.get("environment"))
 
     # display("Description", data.get("description")) # temporarly remove the description
-    display("Action Taken", data.get("action_taken"))
+    # display("Actions Taken", data.get("action_taken"))
+    # check if the action_taken is in bulletList if not print in a single line.
+    bullets = data.get("action_taken_bullets")
+    if bullets:
+        print(" * Actions Taken:")
+        for bullet in bullets:
+            print(f"   - {bullet}")
+    else:
+        display("Actions Taken", data.get("action_taken_text"))
 
     # check for label name unplanned and cslc-ops-svcdesk
     # if unplanned and cslc-ops-svcdesk missing add to findings and print to the gui.
@@ -329,7 +416,6 @@ def print_issue_summary(data):
             display(key, note)
     else:
         print(" * No issues found.")
-
 
 
 # --- Main Execution ---
